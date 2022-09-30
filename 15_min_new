@@ -1,0 +1,121 @@
+//@version=4
+
+strategy("hilega_milega",overlay = true)
+
+var pos = 0
+
+startDate = input(title="Start Date", type=input.integer,
+     defval=1, minval=1, maxval=31)
+startMonth = input(title="Start Month", type=input.integer,
+     defval=1, minval=1, maxval=12)
+startYear = input(title="Start Year", type=input.integer,
+     defval=2006, minval=1800, maxval=2100)
+
+endDate = input(title="End Date", type=input.integer,
+     defval=1, minval=1, maxval=31)
+endMonth = input(title="End Month", type=input.integer,
+     defval=7, minval=1, maxval=12)
+endYear = input(title="End Year", type=input.integer,
+     defval=2022, minval=1800, maxval=2100)
+
+rsi = rsi(close,9)
+
+wma = wma(rsi,21)
+
+ema = ema(rsi,3)
+
+
+htf_rsi = security(syminfo.tickerid, "1D", rsi(close,9), lookahead=barmerge.lookahead_on)
+
+htf_wma = security(syminfo.tickerid, "1D", wma(rsi,21), lookahead=barmerge.lookahead_on)
+
+htf_ema = security(syminfo.tickerid, "1D", ema(rsi,3), lookahead=barmerge.lookahead_on)
+
+// weely
+
+htf_rsi_week = security(syminfo.tickerid, "1W", rsi(close,9), lookahead=barmerge.lookahead_on)
+
+htf_wma_week = security(syminfo.tickerid, "1W", wma(rsi,21), lookahead=barmerge.lookahead_on)
+
+htf_ema_week = security(syminfo.tickerid, "1W", ema(rsi,3), lookahead=barmerge.lookahead_on)
+
+// 2h 
+
+htf_rsi_2h = security(syminfo.tickerid, "120", rsi(close,9), lookahead=barmerge.lookahead_on)
+
+htf_wma_2h = security(syminfo.tickerid, "120", wma(rsi,21), lookahead=barmerge.lookahead_on)
+
+htf_ema_2h = security(syminfo.tickerid, "120", ema(rsi,3), lookahead=barmerge.lookahead_on)
+
+// monthly
+
+htf_rsi_month = security(syminfo.tickerid, "1M", rsi(close,9), lookahead=barmerge.lookahead_on)
+
+htf_wma_month = security(syminfo.tickerid, "1M", wma(rsi,21), lookahead=barmerge.lookahead_on)
+
+htf_ema_month = security(syminfo.tickerid, "1M", ema(rsi,3), lookahead=barmerge.lookahead_on)
+
+// monthly condition
+
+L = htf_rsi_month > htf_wma_month and htf_ema_month > htf_wma_month and htf_rsi_month > htf_ema_month
+
+S = htf_rsi_month < htf_wma_month and htf_ema_month < htf_wma_month and htf_rsi_month < htf_ema_month
+
+// Deternine if we are currently LONG
+isLong = false
+isLong := nz(isLong[1], false)
+
+// Determine if we are currently SHORT
+isShort = false
+isShort := nz(isShort[1], false)
+
+// Buy only if the buy signal is triggered and we are not already long
+LONG = not isLong and htf_rsi_2h > htf_wma_2h and htf_rsi > htf_wma and htf_rsi_week > htf_wma_week and htf_ema_week > htf_wma_week and htf_rsi_week > htf_ema_week  and ((rsi > wma or rsi >50)or (((htf_rsi_2h-htf_ema_2h) >=1.5) and crossover(rsi,50)))
+
+// Sell only if the sell signal is triggered and we are not already short
+SHORT = not isShort and htf_rsi_2h < htf_wma_2h and htf_rsi < htf_wma and htf_rsi_week < htf_wma_week and htf_ema_week < htf_wma_week and htf_rsi_week < htf_ema_week  and ((rsi < wma or rsi < 50)or (((htf_ema_2h-htf_rsi_2h) >=1.5) and crossunder(rsi,50)))
+
+// buy exit
+
+
+buyExit = rsi < wma
+
+
+// sell exit
+
+sellExit = rsi>wma
+
+plotshape(not LONG[1] and LONG, title='Buy Label', style=shape.labelup, location=location.belowbar, size=size.normal, text='Buy', textcolor=color.new(color.white, 0), color=color.new(color.green, 0))
+
+plotshape(not SHORT[1] and SHORT, title='Sell Label', style=shape.labeldown, location=location.abovebar, size=size.normal, text='Sell', textcolor=color.new(color.white, 0), color=color.new(color.red, 0))
+
+if LONG and pos <= 0
+    isLong := true
+    isShort := false
+    isShort
+    pos := 1
+
+if (buyExit)
+    isLong := false
+    isShort := false
+
+if SHORT and pos >= 0
+    isLong := false
+    isShort := true
+    isShort
+    pos :=-1
+
+if (sellExit)
+    isLong := false
+    isShort := false
+
+
+strategy.entry("long", strategy.long, 1, when = LONG)
+
+strategy.entry("Short", strategy.short, 1, when = SHORT)
+
+strategy.close("long",when = (htf_rsi_2h < htf_ema_2h)) 
+strategy.close("Short",when = (htf_rsi_2h > htf_ema_2h))
+
+// strategy.close("long",when = (rsi < wma)) 
+// strategy.close("Short",when = (rsi > wma))
